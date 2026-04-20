@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# 環境変数（パスワードが入っているので必ず除外）
+backend/.env
+
+# DB
+*.db
+*.sqlite
+
+# Node
+node_modules/
+frontend/dist/
+
+# Alembic
+backend/alembic/versions/*.pyc
+
+# OS
+.DS_Store
+Thumbs.db
