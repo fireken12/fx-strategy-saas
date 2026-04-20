@@ -6,6 +6,7 @@ import {
   StrategyCompareDrawdownChart,
 } from "../components/StrategyCompareOverlayChart";
 import { CandlestickChart } from "../components/CandlestickChart";
+import { API_BASE } from "../api/client";
 
 const COLORS = ["#6366f1", "#f59e0b", "#10b981", "#ef4444", "#3b82f6"];
 
@@ -123,7 +124,7 @@ export function StrategyComparePage() {
   const { share } = useCompareShare(selectedIds);
 
   const fetchStrategies = () => {
-    fetch("/api/strategies")
+    fetch(`${API_BASE}/api/strategies`)
       .then((r) => r.json())
       .then(setStrategies)
       .catch(() => {});
@@ -147,11 +148,11 @@ export function StrategyComparePage() {
     Promise.all(
       selectedIds.map((id) =>
         Promise.all([
-          fetch(`/api/strategies/${id}`).then((r) => {
+          fetch(`${API_BASE}/api/strategies/${id}`).then((r) => {
             if (!r.ok) throw new Error(`Strategy ${id} not found`);
             return r.json() as Promise<Strategy>;
           }),
-          fetch(`/api/strategies/${id}/backtest`).then((r) => {
+          fetch(`${API_BASE}/api/strategies/${id}/backtest`).then((r) => {
             if (!r.ok) throw new Error(`Backtest failed for ${id}`);
             return r.json() as Promise<BacktestResult>;
           }),
@@ -222,7 +223,7 @@ export function StrategyComparePage() {
         params.bb_period = form.bb_period;
         params.bb_std = form.bb_std;
       }
-      const res = await fetch("/api/strategies", {
+      const res = await fetch(`${API_BASE}/api/strategies`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: form.name, params }),
@@ -239,7 +240,7 @@ export function StrategyComparePage() {
 
   const handleDelete = async (id: string) => {
     if (!window.confirm("この戦略を削除しますか？")) return;
-    await fetch(`/api/strategies/${id}`, { method: "DELETE" });
+    await fetch(`${API_BASE}/api/strategies/${id}`, { method: "DELETE" });
     setCheckedIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
     fetchStrategies();
   };

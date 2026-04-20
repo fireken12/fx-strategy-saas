@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { API_BASE } from "../api/client";
 
 export function CompareSnapshotLoader() {
   const { shortId } = useParams();
@@ -10,7 +11,7 @@ export function CompareSnapshotLoader() {
       navigate("/compare", { replace: true });
       return;
     }
-    fetch(`/api/compare/snapshots/${shortId}`)
+    fetch(`${API_BASE}/api/compare/snapshots/${shortId}`)
       .then((r) => {
         if (!r.ok) throw new Error("not found");
         return r.json();

@@ -1,10 +1,11 @@
 import { useToast } from "../contexts/ToastContext";
+import { API_BASE } from "../api/client";
 
 export function useCompareShare(ids: string[]) {
   const { showToast } = useToast();
 
   const share = async () => {
-    const res = await fetch("/api/compare/snapshots", {
+    const res = await fetch(`${API_BASE}/api/compare/snapshots`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ strategy_ids: ids }),

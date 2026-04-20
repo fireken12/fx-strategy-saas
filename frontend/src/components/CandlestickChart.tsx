@@ -14,6 +14,7 @@ import {
   type SeriesMarker,
   type Time,
 } from "lightweight-charts";
+import { API_BASE } from "../api/client";
 
 interface CandlePoint { time: string; open: number; high: number; low: number; close: number; }
 interface CandleMarker { time: string; direction: string; action: string; }
@@ -107,7 +108,7 @@ export function CandlestickChart({ strategyId, strategyName, focusDate }: Props)
     setLoading(true);
     setError(null);
 
-    fetch(`/api/strategies/${strategyId}/candles?interval=${interval}&period=${cfg.period}`)
+    fetch(`${API_BASE}/api/strategies/${strategyId}/candles?interval=${interval}&period=${cfg.period}`)
       .then((r) => { if (!r.ok) throw new Error("データ取得失敗"); return r.json(); })
       .then((data: CandlesApiResponse) => {
         if (!seriesRef.current || !chartRef.current) return;
@@ -295,5 +296,5 @@ function SubPanel({ containerRef, chartRef, bgColor }: {
     return () => { ro.disconnect(); chart.remove(); chartRef.current = null; };
   }, []);
 
-  return <div ref={containerRef} style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }} />;
+  return <div ref={containerRef as React.RefObject<HTMLDivElement>} style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }} />;
 }
