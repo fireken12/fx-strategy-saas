@@ -64,6 +64,7 @@ export function CandlestickChart({ strategyId, strategyName, focusDate }: Props)
   const [error, setError] = useState<string | null>(null);
   const [showMarkers, setShowMarkers] = useState(true);
   const [strategyType, setStrategyType] = useState("sma_crossover");
+  const [candlesData, setCandlesData] = useState<CandlesApiResponse | null>(null);
   const markersRef = useRef<SeriesMarker<Time>[]>([]);
   const markersPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const candleDatesRef = useRef<string[]>([]);
@@ -112,7 +113,6 @@ export function CandlestickChart({ strategyId, strategyName, focusDate }: Props)
       .then((r) => { if (!r.ok) throw new Error("データ取得失敗"); return r.json(); })
       .then((data: CandlesApiResponse) => {
         if (!seriesRef.current || !chartRef.current) return;
-        setStrategyType(data.strategy_type);
 
         const toTime = (s: string): Time => {
           if (!s.includes(" ")) return s as Time;
@@ -146,22 +146,6 @@ export function CandlestickChart({ strategyId, strategyName, focusDate }: Props)
           bbL.setData(toLineData(data.indicators.bb_lower));
         }
 
-        // RSI panel
-        if (data.strategy_type === "rsi" && data.indicators.rsi && rsiChartRef.current) {
-          const rsiSeries = rsiChartRef.current.addSeries(LineSeries, { color: "#8b5cf6", lineWidth: 2, priceLineVisible: false });
-          rsiSeries.setData(toLineData(data.indicators.rsi));
-          rsiChartRef.current.timeScale().fitContent();
-        }
-
-        // MACD panel
-        if (data.strategy_type === "macd" && data.indicators.macd && data.indicators.macd_signal && macdChartRef.current) {
-          const macdLine = macdChartRef.current.addSeries(LineSeries, { color: "#6366f1", lineWidth: 2, priceLineVisible: false });
-          macdLine.setData(toLineData(data.indicators.macd));
-          const signalLine = macdChartRef.current.addSeries(LineSeries, { color: "#f59e0b", lineWidth: 1, priceLineVisible: false });
-          signalLine.setData(toLineData(data.indicators.macd_signal));
-          macdChartRef.current.timeScale().fitContent();
-        }
-
         const markers: SeriesMarker<Time>[] = data.markers.map((m) => {
           const isEntry = m.action === "entry";
           const isLong = m.direction === "long";
@@ -187,29 +171,59 @@ export function CandlestickChart({ strategyId, strategyName, focusDate }: Props)
           });
         }
 
-        // 時間軸同期（RSI / MACD）
-        const subCharts = [
-          data.strategy_type === "rsi" ? rsiChartRef.current : null,
-          data.strategy_type === "macd" ? macdChartRef.current : null,
-        ].filter(Boolean) as IChartApi[];
-
-        subCharts.forEach((sub) => {
-          const main = chartRef.current!.timeScale();
-          const subTs = sub.timeScale();
-          let syncing = false;
-          main.subscribeVisibleLogicalRangeChange((range) => {
-            if (syncing || !range) return;
-            syncing = true; subTs.setVisibleLogicalRange(range); syncing = false;
-          });
-          subTs.subscribeVisibleLogicalRangeChange((range) => {
-            if (syncing || !range) return;
-            syncing = true; main.setVisibleLogicalRange(range); syncing = false;
-          });
-        });
+        // Trigger subchart population via separate effect (runs AFTER SubPanel mounts)
+        setStrategyType(data.strategy_type);
+        setCandlesData(data);
       })
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
   }, [strategyId, interval]);
+
+  // Populate RSI / MACD subcharts AFTER SubPanel mounts (strategyType change → re-render → SubPanel's effect sets ref → this effect runs)
+  useEffect(() => {
+    if (!candlesData || !chartRef.current) return;
+
+    const toTime = (s: string): Time => {
+      if (!s.includes(" ")) return s as Time;
+      const [date, time] = s.split(" ");
+      return (new Date(`${date}T${time}:00Z`).getTime() / 1000) as unknown as Time;
+    };
+    const toLineData = (pts: IndicatorPoint[]): LineData[] =>
+      pts.map((p) => ({ time: toTime(p.time), value: p.value }));
+
+    let subChart: IChartApi | null = null;
+
+    if (strategyType === "rsi" && candlesData.indicators.rsi && rsiChartRef.current) {
+      const rsiSeries = rsiChartRef.current.addSeries(LineSeries, { color: "#8b5cf6", lineWidth: 2, priceLineVisible: false });
+      rsiSeries.setData(toLineData(candlesData.indicators.rsi));
+      rsiChartRef.current.timeScale().fitContent();
+      subChart = rsiChartRef.current;
+    }
+
+    if (strategyType === "macd" && candlesData.indicators.macd && candlesData.indicators.macd_signal && macdChartRef.current) {
+      const macdLine = macdChartRef.current.addSeries(LineSeries, { color: "#6366f1", lineWidth: 2, priceLineVisible: false });
+      macdLine.setData(toLineData(candlesData.indicators.macd));
+      const signalLine = macdChartRef.current.addSeries(LineSeries, { color: "#f59e0b", lineWidth: 1, priceLineVisible: false });
+      signalLine.setData(toLineData(candlesData.indicators.macd_signal));
+      macdChartRef.current.timeScale().fitContent();
+      subChart = macdChartRef.current;
+    }
+
+    // 時間軸同期
+    if (subChart) {
+      const main = chartRef.current.timeScale();
+      const subTs = subChart.timeScale();
+      let syncing = false;
+      main.subscribeVisibleLogicalRangeChange((range) => {
+        if (syncing || !range) return;
+        syncing = true; subTs.setVisibleLogicalRange(range); syncing = false;
+      });
+      subTs.subscribeVisibleLogicalRangeChange((range) => {
+        if (syncing || !range) return;
+        syncing = true; main.setVisibleLogicalRange(range); syncing = false;
+      });
+    }
+  }, [candlesData, strategyType, interval]);
 
   // focusDateジャンプ
   useEffect(() => {
