@@ -3,11 +3,26 @@ import yfinance as yf
 import pandas as pd
 from typing import List, Dict, Any, Optional
 
+try:
+    from curl_cffi import requests as curl_requests
+    _HAS_CURL_CFFI = True
+except ImportError:
+    _HAS_CURL_CFFI = False
+
 # ---------------------------------------------------------------------------
 # In-memory cache for Yahoo Finance data (1h TTL)
 # ---------------------------------------------------------------------------
 _df_cache: Dict = {}
 _CACHE_TTL = 3600
+
+
+def _build_session():
+    """Return a curl_cffi session impersonating a real browser to avoid
+    Yahoo Finance blocking cloud IP ranges. Falls back to None (yfinance
+    default) if curl_cffi is not available."""
+    if not _HAS_CURL_CFFI:
+        return None
+    return curl_requests.Session(impersonate="chrome")
 
 
 def _fetch_data(symbol: str, interval: str, period: str) -> pd.DataFrame:
@@ -17,7 +32,9 @@ def _fetch_data(symbol: str, interval: str, period: str) -> pd.DataFrame:
         ts, df = _df_cache[key]
         if now - ts < _CACHE_TTL:
             return df.copy()
-    df = yf.Ticker(symbol).history(period=period, interval=interval)
+    session = _build_session()
+    ticker = yf.Ticker(symbol, session=session) if session else yf.Ticker(symbol)
+    df = ticker.history(period=period, interval=interval)
     if not df.empty:
         _df_cache[key] = (now, df)
     return df.copy()
